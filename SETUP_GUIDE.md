@@ -54,7 +54,7 @@ Now that you have your credentials, you need to plug them into the backend. Open
 
 ```env
 # Paste the MongoDB string you generated (make sure you swapped the password)
-MONGO_URI=mongodb+srv://EventFlowadmin:your_actual_password@cluster0.xxxxx.mongodb.net/EventFlow?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/EventFlow?retryWrites=true&w=majority
 
 # This can be any random string, but keep it secure.
 JWT_SECRET=supersecretjwtkey_EventFlow

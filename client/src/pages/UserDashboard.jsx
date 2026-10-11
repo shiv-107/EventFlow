@@ -3,6 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../utils/axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaTicketAlt, FaTimesCircle } from 'react-icons/fa';
+import { QRCodeSVG } from 'qrcode.react';
 
 const UserDashboard = () => {
     const { user } = useContext(AuthContext);
@@ -100,6 +101,40 @@ const UserDashboard = () => {
                                             <p><strong className="text-gray-700">Date:</strong> {new Date(booking.eventId.date).toLocaleDateString()}</p>
                                             <p><strong className="text-gray-700">Amount:</strong> {booking.amount === 0 ? 'Free' : `₹${booking.amount}`}</p>
                                             <p><strong className="text-gray-700">Requested:</strong> {new Date(booking.bookedAt).toLocaleDateString()}</p>
+
+{/* QR ticket section */}                                                                     
+{booking.status === 'confirmed' && (
+    <div className="mt-5 p-4 bg-green-50 border border-green-100 rounded-xl text-center">
+        <h4 className="font-bold text-green-800 mb-3">
+            Your Event Ticket
+        </h4>
+
+        {booking.ticketToken ? (
+            <>
+                <div className="inline-block bg-white p-3 rounded-lg shadow-sm">
+                    <QRCodeSVG
+                        value={booking.ticketToken}
+                        size={160}
+                        level="H"
+                    />
+                </div>
+
+                <p className="text-xs text-green-700 mt-3">
+                    Show this QR code at event entry.
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                    Ticket ID: {booking._id}
+                </p>
+            </>
+        ) : (
+            <p className="text-sm text-amber-700">
+                Ticket is not available yet. Please contact the admin.
+            </p>
+        )}
+    </div>
+)}
+
                                         </div>
                                     </>
                                 ) : (

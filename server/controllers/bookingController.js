@@ -122,3 +122,78 @@ exports.cancelBooking = async (req, res) => {
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
+
+
+exports.verifyTicket = async (req, res) => {
+    try {
+        const { ticketToken } = req.body;
+
+        if (!ticketToken) {
+            return res.status(400).json({
+                valid: false,
+                message: 'Ticket token is required'
+            });
+        }
+
+        // Atomically verify the ticket and mark it as used.
+        const booking = await Booking.findOneAndUpdate(
+            {
+                ticketToken,
+                status: 'confirmed',
+                checkedIn: false
+            },
+            {
+                $set: {
+                    checkedIn: true,
+                    checkedInAt: new Date()
+                }
+            },
+            { new: true }
+        )
+            .populate('userId', 'name email')
+            .populate('eventId', 'title date');
+
+        if (booking) {
+            return res.status(200).json({
+                valid: true,
+                message: 'Ticket verified. Entry allowed.',
+                booking
+            });
+        }
+
+        const existingBooking = await Booking.findOne({ ticketToken });
+
+        if (!existingBooking) {
+            return res.status(404).json({
+                valid: false,
+                message: 'Invalid ticket.'
+            });
+        }
+
+        if (existingBooking.status !== 'confirmed') {
+            return res.status(400).json({
+                valid: false,
+                message: 'Booking is not confirmed.'
+            });
+        }
+
+        if (existingBooking.checkedIn) {
+            return res.status(409).json({
+                valid: false,
+                message: 'Ticket already used. Entry denied.'
+            });
+        }
+
+        return res.status(400).json({
+            valid: false,
+            message: 'Ticket could not be verified.'
+        });
+    } catch (error) {
+        console.error('Ticket verification error:', error);
+        return res.status(500).json({
+            valid: false,
+            message: 'Server error while verifying ticket.'
+        });
+    }
+};
+

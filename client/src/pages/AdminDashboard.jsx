@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/axios';
 import { useNavigate } from 'react-router-dom';
+import { Html5QrcodeScanner } from 'html5-qrcode'; //new cheez add
 
 const AdminDashboard = () => {
     const { user } = useContext(AuthContext);
@@ -9,6 +10,10 @@ const AdminDashboard = () => {
     const [events, setEvents] = useState([]);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+
+     // QR ticket scanner state
+    const [showScanner, setShowScanner] = useState(false);
+    const [scanResult, setScanResult] = useState(null);
 
     const [showEventForm, setShowEventForm] = useState(false);
     const [formData, setFormData] = useState({
@@ -37,6 +42,76 @@ const AdminDashboard = () => {
             setLoading(false);
         }
     };
+
+   
+    // QR Scanner logic
+    useEffect(() => {
+        if (!showScanner) return;
+
+        let scanner;
+        let processing = false;
+        let active = true;
+
+        const startScanner = () => {
+            if (!active) return;
+
+            scanner = new Html5QrcodeScanner(
+                'eventflow-qr-reader',
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                false
+            );
+
+            scanner.render(
+                async (decodedText) => {
+                    if (processing || !active) return;
+                    processing = true;
+
+                    try {
+                        await scanner.clear();
+
+                        const { data } = await api.post(
+                            '/bookings/verify-ticket',
+                            { ticketToken: decodedText }
+                        );
+
+                        if (!active) return;
+
+                        setScanResult({
+                            success: true,
+                            message: data.message,
+                            booking: data.booking
+                        });
+                    } catch (error) {
+                        if (!active) return;
+
+                        setScanResult({
+                            success: false,
+                            message:
+                                error.response?.data?.message ||
+                                'Unable to verify ticket.'
+                        });
+                    } finally {
+                        if (active) setShowScanner(false);
+                    }
+                },
+                () => {}
+            );
+        };
+
+        startScanner();
+
+        return () => {
+            active = false;
+
+            if (scanner) {
+                scanner.clear().catch(() => {});
+            }
+        };
+    }, [showScanner]);
+
 
     const handleCreateEvent = async (e) => {
         e.preventDefault();
@@ -90,13 +165,77 @@ const AdminDashboard = () => {
                     <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">Admin Dashboard</h1>
                     <p className="text-gray-300">Manage events and manually confirm bookings.</p>
                 </div>
-                <button
-                    onClick={() => setShowEventForm(!showEventForm)}
-                    className="w-full md:w-auto bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-md"
-                >
-                    {showEventForm ? 'Cancel Creation' : '+ Create New Event'}
-                </button>
+                
+<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+    <button
+        onClick={() => {
+            setScanResult(null);
+            setShowScanner(!showScanner);
+        }}
+        className="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition shadow-md"
+    >
+        {showScanner ? 'Close Scanner' : 'Scan QR Ticket'}
+    </button>
+
+    <button
+        onClick={() => setShowEventForm(!showEventForm)}
+        className="w-full md:w-auto bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-md"
+    >
+        {showEventForm ? 'Cancel Creation' : '+ Create New Event'}
+    </button>
+</div>
+</div> {/* Black header close */}
+
+{/* QR Ticket Scanner */}
+{showScanner && (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8">
+        <h2 className="text-xl font-bold mb-3 text-gray-800">
+            Scan Event Ticket
+        </h2>
+
+        <p className="text-sm text-gray-500 mb-4">
+            Allow camera access and scan the QR code on the attendee's ticket.
+        </p>
+
+        <div
+            id="eventflow-qr-reader"
+            className="w-full max-w-lg mx-auto"
+        />
+    </div>
+)}
+
+
+{/* QR Verification Result */}
+{scanResult && (
+    <div
+        className={`p-5 rounded-xl border mb-8 ${
+            scanResult.success
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+        }`}
+    >
+        <h3 className="font-bold text-lg">
+            {scanResult.success
+                ? '✓ Entry Allowed'
+                : '✕ Entry Rejected'}
+        </h3>
+
+        <p className="mt-1">{scanResult.message}</p>
+
+        {scanResult.booking && (
+            <div className="mt-3 text-sm space-y-1">
+                <p>
+                    <strong>Attendee:</strong>{' '}
+                    {scanResult.booking.userId?.name || 'N/A'}
+                </p>
+                <p>
+                    <strong>Event:</strong>{' '}
+                    {scanResult.booking.eventId?.title || 'N/A'}
+                </p>
             </div>
+        )}
+    </div>
+)}
 
             {/* Admin Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
